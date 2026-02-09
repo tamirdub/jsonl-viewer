@@ -1,6 +1,6 @@
 # JSONL Pretty Viewer
 
-> Cursor / VS Code extension that displays `.jsonl` files prettified with **jq-style syntax coloring**.
+> Cursor / VS Code extension that displays `.jsonl` files with **pretty-printing and syntax highlighting**.
 
 Open any `.jsonl` file and it renders as formatted, color-coded JSON — no extra steps. Toggle back to raw text with one click.
 
@@ -9,7 +9,7 @@ Open any `.jsonl` file and it renders as formatted, color-coded JSON — no extr
 | Feature | Description |
 |---|---|
 | **Auto-prettify** | `.jsonl` files open formatted by default |
-| **jq-style colors** | Keys, strings, numbers, booleans, nulls, braces, brackets — all color-coded |
+| **Syntax highlighting** | Keys, strings, numbers, booleans, nulls, braces, brackets — all color-coded |
 | **Pretty / Raw toggle** | Switch views with a single click |
 | **Collapse / Expand** | Per-entry or all-at-once |
 | **Search** | Real-time filtering with match highlighting and count |
@@ -29,7 +29,7 @@ Search for **JSONL Pretty Viewer** in the Extensions panel (`Cmd+Shift+X`).
 
 ```bash
 # Clone the repo
-git clone https://github.com/tamircohen/jsonl-viewer.git
+git clone https://github.com/tamirdub/jsonl-viewer.git
 cd jsonl-viewer
 
 # Package
@@ -55,7 +55,7 @@ Then reload: `Cmd+Shift+P` → `Developer: Reload Window`.
 
 ## Color Scheme
 
-Matches `jq` output style:
+Dark theme optimized:
 
 - **Keys** — light blue `#9cdcfe`
 - **Strings** — orange `#ce9178`
@@ -69,7 +69,7 @@ Matches `jq` output style:
 Issues and PRs welcome. To develop locally:
 
 ```bash
-git clone https://github.com/tamircohen/jsonl-viewer.git
+git clone https://github.com/tamirdub/jsonl-viewer.git
 cd jsonl-viewer
 ln -sf "$(pwd)" ~/.cursor/extensions/local.jsonl-viewer-0.1.0
 # Reload Cursor, edit extension.js, reload again to test changes

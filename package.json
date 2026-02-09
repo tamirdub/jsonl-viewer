@@ -1,9 +1,9 @@
 {
   "name": "jsonl-viewer",
   "displayName": "JSONL Pretty Viewer",
-  "description": "Opens .jsonl files prettified with jq-style syntax coloring. Toggle between pretty and raw views with a single click.",
+  "description": "Opens .jsonl files with pretty-printing and syntax highlighting. Toggle between formatted and raw views with a single click.",
   "version": "0.1.0",
-  "publisher": "tamircohen",
+  "publisher": "tamirdub",
   "license": "MIT",
   "icon": "icon.png",
   "engines": {
@@ -11,12 +11,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/tamircohen/jsonl-viewer"
+    "url": "https://github.com/tamirdub/jsonl-viewer"
   },
   "bugs": {
-    "url": "https://github.com/tamircohen/jsonl-viewer/issues"
+    "url": "https://github.com/tamirdub/jsonl-viewer/issues"
   },
-  "homepage": "https://github.com/tamircohen/jsonl-viewer#readme",
+  "homepage": "https://github.com/tamirdub/jsonl-viewer#readme",
   "categories": [
     "Other",
     "Visualization"
@@ -27,12 +27,13 @@
     "json",
     "viewer",
     "prettify",
-    "jq",
+    "syntax-highlighting",
     "ndjson",
     "data"
   ],
   "activationEvents": [
-    "onCustomEditor:jsonlViewer.prettyView"
+    "onCustomEditor:jsonlViewer.prettyView",
+    "onStartupFinished"
   ],
   "main": "./extension.js",
   "contributes": {

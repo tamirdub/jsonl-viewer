@@ -19,6 +19,36 @@ function activate(context) {
     openPrettyCommand
   );
   context.subscriptions.push(openCmd);
+
+  reopenJsonlTabs();
+}
+
+function reopenJsonlTabs() {
+  const jsonlTabs = vscode.window.tabGroups.all
+    .flatMap(function (group) { return group.tabs; })
+    .filter(function (tab) {
+      if (!tab.input || typeof tab.input !== 'object') return false;
+      var uri = tab.input.uri;
+      return uri && uri.fsPath && uri.fsPath.endsWith('.jsonl') && tab.input.viewType === undefined;
+    });
+
+  if (jsonlTabs.length === 0) return;
+
+  var label = jsonlTabs.length === 1
+    ? '1 open .jsonl file found'
+    : jsonlTabs.length + ' open .jsonl files found';
+
+  vscode.window.showInformationMessage(
+    label + '. Reopen with JSONL Pretty Viewer?',
+    'Yes',
+    'No'
+  ).then(function (choice) {
+    if (choice !== 'Yes') return;
+    jsonlTabs.forEach(function (tab) {
+      var uri = tab.input.uri;
+      vscode.commands.executeCommand('vscode.openWith', uri, VIEW_TYPE);
+    });
+  });
 }
 
 function deactivate() {}
