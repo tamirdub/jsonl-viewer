@@ -97,6 +97,16 @@ class JsonlEditorProvider {
       if (msg.type === 'copyEntry') {
         vscode.env.clipboard.writeText(msg.text);
         vscode.window.showInformationMessage('Copied entry to clipboard');
+        return;
+      }
+      if (msg.type === 'replaceContent') {
+        const edit = new vscode.WorkspaceEdit();
+        const fullRange = new vscode.Range(
+          document.lineAt(0).range.start,
+          document.lineAt(document.lineCount - 1).range.end
+        );
+        edit.replace(document.uri, fullRange, msg.content);
+        vscode.workspace.applyEdit(edit);
       }
     });
 
@@ -225,12 +235,22 @@ function getWebviewHtml(filePath) {
     }
     .toggle-group button + button { border-left: 1px solid var(--border); }
 
-    .search-bar {
+    .search-panel {
+      display: none;
+      padding: 6px 16px 2px;
+      gap: 6px;
+      flex-direction: column;
+      flex-shrink: 0;
+      background: var(--bg-card);
+      border-bottom: 1px solid var(--border);
+    }
+    .search-panel.open { display: flex; }
+    .search-row {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
     }
-    .search-bar input {
+    .search-row input {
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 12px;
       padding: 3px 8px;
@@ -238,11 +258,51 @@ function getWebviewHtml(filePath) {
       border: 1px solid var(--border);
       background: var(--bg);
       color: var(--text);
-      width: 180px;
+      flex: 1;
+      min-width: 120px;
       outline: none;
     }
-    .search-bar input:focus { border-color: var(--accent); }
-    .search-count { font-size: 11px; color: var(--text-muted); min-width: 55px; }
+    .search-row input:focus { border-color: var(--accent); }
+    .search-nav {
+      font-family: inherit;
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      background: var(--btn-bg);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .search-nav:hover { background: var(--btn-hover); }
+    .search-info {
+      font-size: 11px;
+      color: var(--text-muted);
+      min-width: 70px;
+      text-align: center;
+    }
+    .replace-row { display: none; }
+    .replace-row.open { display: flex; }
+    .replace-btn {
+      font-family: inherit;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      background: var(--btn-bg);
+      color: var(--text);
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .replace-btn:hover { background: var(--btn-hover); }
+    .search-toggle {
+      font-size: 11px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 2px 4px;
+    }
+    .search-toggle:hover { color: var(--text); }
 
     .content {
       flex: 1;
@@ -355,6 +415,7 @@ function getWebviewHtml(filePath) {
     .raw-lt { flex: 1; overflow-x: auto; }
 
     .sh { background: var(--highlight-bg); border-radius: 2px; }
+    .sh.cur { background: var(--highlight-current); outline: 1px solid #ffa500; }
 
     .empty-state {
       display: flex;
@@ -386,10 +447,7 @@ function getWebviewHtml(filePath) {
   <div class="toolbar">
     <span class="toolbar-title">${fileName}</span>
     <span class="toolbar-stats" id="stats">Loading...</span>
-    <div class="search-bar">
-      <input type="text" id="searchInput" placeholder="Search..." />
-      <span class="search-count" id="searchCount"></span>
-    </div>
+    <button id="btnSearch" class="search-toggle" title="Toggle Search (Cmd+F)">Search</button>
     <div class="toggle-group">
       <button id="btnPretty" class="active">Pretty</button>
       <button id="btnRaw">Raw</button>
@@ -397,6 +455,21 @@ function getWebviewHtml(filePath) {
     <button id="btnCollapseAll">Collapse All</button>
     <button id="btnExpandAll">Expand All</button>
     <button id="btnOpenText">Open as Text</button>
+  </div>
+  <div class="search-panel" id="searchPanel">
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="Search..." />
+      <span class="search-info" id="searchInfo"></span>
+      <button class="search-nav" id="btnPrev" title="Previous (Shift+Enter)">&#x25B2;</button>
+      <button class="search-nav" id="btnNext" title="Next (Enter)">&#x25BC;</button>
+      <button class="search-toggle" id="btnToggleReplace" title="Toggle Replace (Cmd+H)">&#x25B6; Replace</button>
+      <button class="search-toggle" id="btnCloseSearch" title="Close (Escape)">&#x2715;</button>
+    </div>
+    <div class="replace-row" id="replaceRow">
+      <input type="text" id="replaceInput" placeholder="Replace..." />
+      <button class="replace-btn" id="btnReplace">Replace</button>
+      <button class="replace-btn" id="btnReplaceAll">Replace All</button>
+    </div>
   </div>
   <div class="content" id="content"></div>
 
@@ -411,11 +484,17 @@ function getWebviewHtml(filePath) {
   var BATCH_SIZE = 200;
   var renderedCount = 0;
 
+  var matchCount = 0;
+  var currentMatch = -1;
+
   // --- DOM refs ---
   var contentEl = document.getElementById('content');
   var statsEl = document.getElementById('stats');
+  var searchPanel = document.getElementById('searchPanel');
   var searchInput = document.getElementById('searchInput');
-  var searchCountEl = document.getElementById('searchCount');
+  var searchInfo = document.getElementById('searchInfo');
+  var replaceRow = document.getElementById('replaceRow');
+  var replaceInput = document.getElementById('replaceInput');
   var btnPretty = document.getElementById('btnPretty');
   var btnRaw = document.getElementById('btnRaw');
 
@@ -427,7 +506,48 @@ function getWebviewHtml(filePath) {
   document.getElementById('btnOpenText').addEventListener('click', function() {
     vscodeApi.postMessage({ type: 'openInTextEditor' });
   });
+  document.getElementById('btnSearch').addEventListener('click', toggleSearchPanel);
+  document.getElementById('btnCloseSearch').addEventListener('click', closeSearch);
+  document.getElementById('btnNext').addEventListener('click', function() { jumpMatch(1); });
+  document.getElementById('btnPrev').addEventListener('click', function() { jumpMatch(-1); });
+  document.getElementById('btnToggleReplace').addEventListener('click', toggleReplace);
+  document.getElementById('btnReplace').addEventListener('click', replaceCurrent);
+  document.getElementById('btnReplaceAll').addEventListener('click', replaceAll);
   searchInput.addEventListener('input', onSearch);
+
+  // Keyboard shortcuts
+  document.addEventListener('keydown', function(e) {
+    // Cmd/Ctrl+F: open search
+    if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+      e.preventDefault();
+      openSearch();
+      return;
+    }
+    // Cmd/Ctrl+H: open search + replace
+    if ((e.metaKey || e.ctrlKey) && e.key === 'h') {
+      e.preventDefault();
+      openSearch();
+      replaceRow.classList.add('open');
+      return;
+    }
+    // Escape: close search
+    if (e.key === 'Escape' && searchPanel.classList.contains('open')) {
+      e.preventDefault();
+      closeSearch();
+      return;
+    }
+    // Enter / Shift+Enter in search input: next/prev
+    if (e.key === 'Enter' && document.activeElement === searchInput) {
+      e.preventDefault();
+      jumpMatch(e.shiftKey ? -1 : 1);
+      return;
+    }
+    // Enter in replace input: replace current
+    if (e.key === 'Enter' && document.activeElement === replaceInput) {
+      e.preventDefault();
+      replaceCurrent();
+    }
+  });
 
   window.addEventListener('message', function(ev) {
     var msg = ev.data;
@@ -656,20 +776,92 @@ function getWebviewHtml(filePath) {
     return s;
   }
 
-  // --- Search ---
+  // --- Search Panel ---
+
+  function toggleSearchPanel() {
+    if (searchPanel.classList.contains('open')) {
+      closeSearch();
+    } else {
+      openSearch();
+    }
+  }
+
+  function openSearch() {
+    searchPanel.classList.add('open');
+    searchInput.focus();
+    searchInput.select();
+  }
+
+  function closeSearch() {
+    searchPanel.classList.remove('open');
+    replaceRow.classList.remove('open');
+    if (searchTerm) {
+      searchTerm = '';
+      searchInput.value = '';
+      searchInfo.textContent = '';
+      matchCount = 0;
+      currentMatch = -1;
+      render();
+    }
+  }
+
+  function toggleReplace() {
+    replaceRow.classList.toggle('open');
+    var arrow = replaceRow.classList.contains('open') ? '\\u25BC' : '\\u25B6';
+    document.getElementById('btnToggleReplace').innerHTML = arrow + ' Replace';
+    if (replaceRow.classList.contains('open')) replaceInput.focus();
+  }
+
+  // --- Search Logic ---
 
   function onSearch() {
     searchTerm = searchInput.value;
+    currentMatch = -1;
     render();
-    if (searchTerm) {
-      var allText = '';
-      for (var i = 0; i < entries.length; i++) allText += entries[i].raw + '\\n';
-      var rx = new RegExp(escRx(searchTerm), 'gi');
-      var m = allText.match(rx);
-      searchCountEl.textContent = (m ? m.length : 0) + ' matches';
-    } else {
-      searchCountEl.textContent = '';
+    countMatches();
+    if (matchCount > 0) {
+      currentMatch = 0;
+      highlightCurrent();
     }
+  }
+
+  function countMatches() {
+    if (!searchTerm) {
+      matchCount = 0;
+      searchInfo.textContent = '';
+      return;
+    }
+    var spans = contentEl.querySelectorAll('.sh');
+    matchCount = spans.length;
+    updateSearchInfo();
+  }
+
+  function updateSearchInfo() {
+    if (matchCount === 0 && searchTerm) {
+      searchInfo.textContent = 'No results';
+    } else if (matchCount > 0) {
+      searchInfo.textContent = (currentMatch + 1) + ' of ' + matchCount;
+    } else {
+      searchInfo.textContent = '';
+    }
+  }
+
+  function jumpMatch(dir) {
+    if (matchCount === 0) return;
+    currentMatch = (currentMatch + dir + matchCount) % matchCount;
+    highlightCurrent();
+  }
+
+  function highlightCurrent() {
+    var spans = contentEl.querySelectorAll('.sh');
+    for (var i = 0; i < spans.length; i++) {
+      spans[i].classList.remove('cur');
+    }
+    if (currentMatch >= 0 && currentMatch < spans.length) {
+      spans[currentMatch].classList.add('cur');
+      spans[currentMatch].scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    updateSearchInfo();
   }
 
   function applySearch(html) {
@@ -678,6 +870,78 @@ function getWebviewHtml(filePath) {
     return html.replace(/>([^<]*)</g, function(full, text) {
       return '>' + text.replace(rx, '<span class="sh">$1</span>') + '<';
     });
+  }
+
+  // --- Replace ---
+
+  function replaceCurrent() {
+    if (matchCount === 0 || !searchTerm) return;
+    var replaceWith = replaceInput.value;
+    var rx = new RegExp(escRx(searchTerm), 'gi');
+    var hitCount = 0;
+    var target = currentMatch;
+
+    for (var i = 0; i < entries.length; i++) {
+      var raw = entries[i].raw;
+      var newRaw = raw.replace(rx, function(m) {
+        if (hitCount === target) {
+          hitCount++;
+          return replaceWith;
+        }
+        hitCount++;
+        return m;
+      });
+      if (newRaw !== raw) {
+        entries[i].raw = newRaw;
+        try {
+          entries[i].parsed = JSON.parse(newRaw);
+          entries[i].err = null;
+        } catch (e) {
+          entries[i].parsed = null;
+          entries[i].err = e.message;
+        }
+      }
+    }
+
+    pushEdits();
+    render();
+    countMatches();
+    if (matchCount > 0) {
+      currentMatch = Math.min(currentMatch, matchCount - 1);
+      highlightCurrent();
+    }
+  }
+
+  function replaceAll() {
+    if (matchCount === 0 || !searchTerm) return;
+    var replaceWith = replaceInput.value;
+    var rx = new RegExp(escRx(searchTerm), 'gi');
+
+    for (var i = 0; i < entries.length; i++) {
+      var newRaw = entries[i].raw.replace(rx, replaceWith);
+      if (newRaw !== entries[i].raw) {
+        entries[i].raw = newRaw;
+        try {
+          entries[i].parsed = JSON.parse(newRaw);
+          entries[i].err = null;
+        } catch (e) {
+          entries[i].parsed = null;
+          entries[i].err = e.message;
+        }
+      }
+    }
+
+    pushEdits();
+    render();
+    countMatches();
+    currentMatch = -1;
+    highlightCurrent();
+  }
+
+  function pushEdits() {
+    var lines = [];
+    for (var i = 0; i < entries.length; i++) lines.push(entries[i].raw);
+    vscodeApi.postMessage({ type: 'replaceContent', content: lines.join('\\n') + '\\n' });
   }
 
   function escRx(s) {
