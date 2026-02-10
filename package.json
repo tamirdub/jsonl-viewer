@@ -2,7 +2,7 @@
   "name": "jsonl-viewer",
   "displayName": "JSONL Pretty Viewer",
   "description": "Opens .jsonl files with pretty-printing and syntax highlighting. Toggle between formatted and raw views with a single click.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "publisher": "tamirdub",
   "license": "MIT",
   "icon": "icon.png",

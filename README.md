@@ -12,7 +12,8 @@ Open any `.jsonl` file and it renders as formatted, color-coded JSON — no extr
 | **Syntax highlighting** | Keys, strings, numbers, booleans, nulls, braces, brackets — all color-coded |
 | **Pretty / Raw toggle** | Switch views with a single click |
 | **Collapse / Expand** | Per-entry or all-at-once |
-| **Search** | Real-time filtering with match highlighting and count |
+| **Search** | `Cmd+F` search with match highlighting, count, and next/prev navigation |
+| **Find & Replace** | `Cmd+H` to find and replace — single or all matches — writes back to the file |
 | **Copy entry** | Hover any entry to copy its prettified JSON |
 | **Open as Text** | Fall back to the standard text editor |
 | **Lazy loading** | Renders 200 entries at a time for large files |
@@ -49,9 +50,10 @@ Then reload: `Cmd+Shift+P` → `Developer: Reload Window`.
 1. **Open any `.jsonl` file** — it opens prettified by default.
 2. **Pretty / Raw** — click the toggle in the toolbar.
 3. **Collapse / Expand** — click ▶/▼ per entry, or use the toolbar buttons.
-4. **Search** — type in the search box; matches highlight in gold.
-5. **Copy** — hover an entry → click **Copy**.
-6. **Switch to text editor** — click **Open as Text**, or right-click the editor tab → **Reopen Editor With...** → **Text Editor**.
+4. **Search** — `Cmd+F` to open search; matches highlight in gold. `Enter` / `Shift+Enter` to jump between matches.
+5. **Find & Replace** — `Cmd+H` to open replace; replace one or all matches. Changes are saved to the file.
+6. **Copy** — hover an entry → click **Copy**.
+7. **Switch to text editor** — click **Open as Text**, or right-click the editor tab → **Reopen Editor With...** → **Text Editor**.
 
 ## Color Scheme
 
